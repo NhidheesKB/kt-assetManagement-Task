@@ -1,0 +1,556 @@
+extends ../layout
+
+block content
+  .d-flex.justify-content-between.align-items-center.mb-3
+    h4.mb-0 Asset Master
+    button.btn.btn-primary(type="button" data-bs-toggle="modal" data-bs-target="#addAssetModal")
+      i.bi.bi-plus-lg.me-1
+      | Add Asset
+
+  .card.shadow-sm.mb-3
+    .card-body.py-3
+      form.row.g-2(method="GET" action="/assets")
+        .col-md-3
+          input.form-control.form-select-sm(type="text" name="search" value=search placeholder="Search make, model, serial, code...")
+        .col-md-2
+          select.form-select.form-select-sm(name="categoryId")
+            option(value="") All Categories
+            each c in categories
+              option(value=c.id selected=selectedCategory === c.id) #{c.name}
+        .col-md-2
+          select.form-select.form-select-sm(name="branchId")
+            option(value="") All Branches
+            each b in branches
+              option(value=b.id selected=selectedBranch === b.id) #{b.name}
+        .col-md-3
+          select.form-select.form-select-sm(name="status")
+            option(value="") Active Assets (Non-Scrapped)
+            option(value="IN_STOCK" selected=selectedStatus === 'IN_STOCK') In Stock
+            option(value="ISSUED" selected=selectedStatus === 'ISSUED') Issued
+            option(value="REPAIR" selected=selectedStatus === 'REPAIR') In Repair
+            option(value="SCRAPPED" selected=selectedStatus === 'SCRAPPED') Scrapped
+        .col-md-2.d-flex.gap-2
+          button.btn.btn-sm.btn-primary.w-100(type="submit") Filter
+          a.btn.btn-sm.btn-outline-secondary(href="/assets") Reset
+
+  .card.shadow-sm
+    .card-body
+      .table-responsive
+        table#assetsTable.table.table-striped.table-bordered.w-100
+          thead.table-light
+            tr
+              th Asset Code
+              th Serial No
+              th Make & Model
+              th Category
+              th Branch
+              th Status
+              th Assigned To
+              th Purchase Value
+              th Actions
+          tbody
+            if assets.length === 0
+              tr
+                td.text-center.text-muted(colspan="9") No assets found
+            else
+              each a in assets
+                tr
+                  td.fw-bold #{a.assetCode}
+                  td #{a.serialNumber}
+                  td #{a.make} #{a.model}
+                  td #{a.category ? a.category.name : '-'}
+                  td #{a.branch ? a.branch.name : '-'}
+                  td
+                    if a.status === 'IN_STOCK'
+                      span.badge.bg-success In Stock
+                    else if a.status === 'ISSUED'
+                      span.badge.bg-primary Issued
+                    else if a.status === 'REPAIR'
+                      span.badge.bg-warning.text-dark In Repair
+                    else if a.status === 'SCRAPPED'
+                      span.badge.bg-danger Scrapped
+                  td #{a.issuedToEmployee ? a.issuedToEmployee.name : '-'}
+                  td.text-end $#{Number(a.purchaseValue).toFixed(2)}
+                  td
+                    .dropdown
+                      button.btn.btn-sm.btn-outline-secondary.dropdown-toggle(type="button" data-bs-toggle="dropdown") Actions
+                      ul.dropdown-menu.dropdown-menu-end
+                        li
+                          a.dropdown-item(href=`/assets/${a.id}/history`)
+                            i.bi.bi-clock-history.me-2
+                            | View History
+                        if a.status === 'IN_STOCK'
+                          li
+                            a.dropdown-item(href="#" onclick=`openIssueModal('${a.id}', '${a.assetCode}', '${a.make} ${a.model}')`)
+                              i.bi.bi-box-arrow-up-right.me-2.text-success
+                              | Issue Asset
+                        if a.status === 'REPAIR'
+                          li
+                            a.dropdown-item.text-primary(href="#" onclick=`openRepairModal('${a.id}', '${a.assetCode}', '${a.make} ${a.model}')`)
+                              i.bi.bi-wrench-adjustable.me-2
+                              | Complete Repair / Reissue
+                        if a.status === 'ISSUED'
+                          li
+                            a.dropdown-item(href="#" onclick=`openReturnModal('${a.id}', '${a.assetCode}', '${a.issuedToEmployee ? a.issuedToEmployee.name : ''}')`)
+                              i.bi.bi-box-arrow-in-left.me-2.text-warning
+                              | Return Asset
+                        if a.status !== 'SCRAPPED'
+                          li
+                            a.dropdown-item(href="#" onclick=`openScrapModal('${a.id}', '${a.assetCode}')`)
+                              i.bi.bi-x-circle.me-2.text-danger
+                              | Scrap Asset
+                        li
+                          hr.dropdown-divider
+                        li
+                          a.dropdown-item(href="#" onclick=`openEditModal('${a.id}', '${a.serialNumber}', '${a.make}', '${a.model}', '${a.categoryId}', '${a.branchId}', '${a.purchaseDate}', '${a.purchaseValue}')`)
+                            i.bi.bi-pencil.me-2
+                            | Edit
+                        if a.status !== 'ISSUED'
+                          li
+                            a.dropdown-item.text-danger(href="#" onclick=`deleteAsset('${a.id}', '${a.assetCode}')`)
+                              i.bi.bi-trash.me-2
+                              | Delete
+
+      if meta
+        .d-flex.justify-content-between.align-items-center.mt-3.pt-2.border-top
+          .text-muted.small
+            | Showing #{meta.total === 0 ? 0 : ((meta.page - 1) * meta.limit) + 1} to #{((meta.page - 1) * meta.limit) + assets.length} of #{meta.total} records (Page #{meta.page} of #{meta.totalPages || 1})
+          ul.pagination.pagination-sm.mb-0
+            li.page-item(class=meta.page <= 1 ? 'disabled' : '')
+              a.page-link(href=meta.page <= 1 ? '#' : `?page=${meta.page - 1}&search=${encodeURIComponent(search || '')}&categoryId=${selectedCategory || ''}&branchId=${selectedBranch || ''}&status=${selectedStatus || ''}`) Previous
+            - for (let p = 1; p <= (meta.totalPages || 1); p++)
+              li.page-item(class=meta.page === p ? 'active' : '')
+                a.page-link(href=`?page=${p}&search=${encodeURIComponent(search || '')}&categoryId=${selectedCategory || ''}&branchId=${selectedBranch || ''}&status=${selectedStatus || ''}`) #{p}
+            li.page-item(class=meta.page >= meta.totalPages || meta.totalPages <= 1 ? 'disabled' : '')
+              a.page-link(href=meta.page >= meta.totalPages ? '#' : `?page=${meta.page + 1}&search=${encodeURIComponent(search || '')}&categoryId=${selectedCategory || ''}&branchId=${selectedBranch || ''}&status=${selectedStatus || ''}`) Next
+
+  #addAssetModal.modal.fade(tabindex="-1")
+    .modal-dialog.modal-lg
+      .modal-content
+        form#addAssetForm
+          .modal-header
+            h5.modal-title Add Asset
+            button.btn-close(type="button" data-bs-dismiss="modal")
+          .modal-body.row.g-3
+            .col-md-6
+              label.form-label Serial Number
+              input.form-control(type="text" name="serialNumber" required)
+            .col-md-6
+              label.form-label Category
+              select.form-select(name="categoryId" required)
+                option(value="") Select Category
+                each c in categories
+                  option(value=c.id) #{c.name}
+            .col-md-6
+              label.form-label Make
+              input.form-control(type="text" name="make" required)
+            .col-md-6
+              label.form-label Model
+              input.form-control(type="text" name="model" required)
+            .col-md-6
+              label.form-label Branch
+              select.form-select(name="branchId" required)
+                option(value="") Select Branch
+                each b in branches
+                  option(value=b.id) #{b.name}
+            .col-md-6
+              label.form-label Purchase Date
+              input.form-control(type="date" name="purchaseDate" required)
+            .col-md-6
+              label.form-label Purchase Value
+              input.form-control(type="number" step="0.01" min="0" name="purchaseValue" required)
+          .modal-footer
+            button.btn.btn-secondary(type="button" data-bs-dismiss="modal") Cancel
+            button.btn.btn-primary(type="submit") Save
+
+  #editAssetModal.modal.fade(tabindex="-1")
+    .modal-dialog.modal-lg
+      .modal-content
+        form#editAssetForm
+          input#editAssetId(type="hidden")
+          .modal-header
+            h5.modal-title Edit Asset
+            button.btn-close(type="button" data-bs-dismiss="modal")
+          .modal-body.row.g-3
+            .col-md-6
+              label.form-label Serial Number
+              input#editSerialNumber.form-control(type="text" name="serialNumber" required)
+            .col-md-6
+              label.form-label Category
+              select#editCategoryId.form-select(name="categoryId" required)
+                each c in categories
+                  option(value=c.id) #{c.name}
+            .col-md-6
+              label.form-label Make
+              input#editMake.form-control(type="text" name="make" required)
+            .col-md-6
+              label.form-label Model
+              input#editModel.form-control(type="text" name="model" required)
+            .col-md-6
+              label.form-label Branch
+              select#editBranchId.form-select(name="branchId" required)
+                each b in branches
+                  option(value=b.id) #{b.name}
+            .col-md-6
+              label.form-label Purchase Date
+              input#editPurchaseDate.form-control(type="date" name="purchaseDate" required)
+            .col-md-6
+              label.form-label Purchase Value
+              input#editPurchaseValue.form-control(type="number" step="0.01" min="0" name="purchaseValue" required)
+          .modal-footer
+            button.btn.btn-secondary(type="button" data-bs-dismiss="modal") Cancel
+            button.btn.btn-primary(type="submit") Update
+
+  #issueModal.modal.fade(tabindex="-1")
+    .modal-dialog
+      .modal-content
+        form#issueAssetForm
+          input#issueAssetId(type="hidden")
+          .modal-header
+            h5.modal-title Issue Asset
+            button.btn-close(type="button" data-bs-dismiss="modal")
+          .modal-body
+            p#issueAssetInfo.text-muted.mb-3
+            .mb-3
+              label.form-label Employee
+              select#issueEmployeeId.form-select(required)
+                option(value="") Select Employee
+            .mb-3
+              label.form-label Remarks
+              textarea#issueRemarks.form-control(rows="2")
+          .modal-footer
+            button.btn.btn-secondary(type="button" data-bs-dismiss="modal") Cancel
+            button.btn.btn-success(type="submit") Issue Asset
+
+  #returnModal.modal.fade(tabindex="-1")
+    .modal-dialog
+      .modal-content
+        form#returnAssetForm
+          input#returnAssetId(type="hidden")
+          .modal-header
+            h5.modal-title Return Asset
+            button.btn-close(type="button" data-bs-dismiss="modal")
+          .modal-body
+            p#returnAssetInfo.text-muted.mb-3
+            .mb-3
+              label.form-label Return Reason
+              select#returnReason.form-select(required)
+                option(value="Upgrade") Upgrade
+                option(value="Repair") Repair / Maintenance
+                option(value="Resignation") Resignation
+                option(value="Project End") Project End
+                option(value="Other") Other
+            .mb-3
+              label.form-label Return Condition
+              select#returnCondition.form-select
+                option(value="IN_STOCK") In Stock (Ready to reuse)
+                option(value="REPAIR") Needs Repair
+            .mb-3
+              label.form-label Remarks
+              textarea#returnRemarks.form-control(rows="2")
+          .modal-footer
+            button.btn.btn-secondary(type="button" data-bs-dismiss="modal") Cancel
+            button.btn.btn-warning(type="submit") Return Asset
+
+  #scrapModal.modal.fade(tabindex="-1")
+    .modal-dialog
+      .modal-content
+        form#scrapAssetForm
+          input#scrapAssetId(type="hidden")
+          .modal-header
+            h5.modal-title Scrap Asset
+            button.btn-close(type="button" data-bs-dismiss="modal")
+          .modal-body
+            p#scrapAssetInfo.text-muted.mb-3
+            .mb-3
+              label.form-label Reason for Scrap
+              input#scrapReason.form-control(type="text" required placeholder="e.g. Broken screen, obsolete")
+            .mb-3
+              label.form-label Remarks
+              textarea#scrapRemarks.form-control(rows="2")
+          .modal-footer
+            button.btn.btn-secondary(type="button" data-bs-dismiss="modal") Cancel
+            button.btn.btn-danger(type="submit") Mark as Scrapped
+
+  #repairModal.modal.fade(tabindex="-1")
+    .modal-dialog
+      .modal-content
+        form#repairAssetForm
+          input#repairAssetId(type="hidden")
+          .modal-header
+            h5.modal-title Complete Repair
+            button.btn-close(type="button" data-bs-dismiss="modal")
+          .modal-body
+            p#repairAssetInfo.text-muted.mb-3
+            .mb-3
+              label.form-label Action After Repair
+              select#repairActionType.form-select
+                option(value="STOCK") Return to In-Stock (Inventory)
+                option(value="REISSUE") Re-issue to Employee directly
+            #repairEmployeeGroup.mb-3.d-none
+              label.form-label Select Employee
+              select#repairEmployeeId.form-select
+                option(value="") Select Employee
+            .mb-3
+              label.form-label Repair Notes / Remarks
+              textarea#repairRemarks.form-control(rows="2" placeholder="e.g. Screen replaced, diagnostics passed")
+          .modal-footer
+            button.btn.btn-secondary(type="button" data-bs-dismiss="modal") Cancel
+            button.btn.btn-primary(type="submit") Complete Repair
+
+block scripts
+  script.
+    document.addEventListener('DOMContentLoaded', () => {
+      new DataTable('#assetsTable', {
+        paging: false,
+        searching: false,
+        info: false,
+        order: []
+      });
+    });
+
+    async function openIssueModal(id, code, name) {
+      document.getElementById('issueAssetId').value = id;
+      document.getElementById('issueAssetInfo').textContent = `Issuing Asset: ${code} (${name})`;
+      const select = document.getElementById('issueEmployeeId');
+      if (select.options.length <= 1) {
+        try {
+          const res = await fetch('/api/employees/active');
+          if (res.ok) {
+            const list = await res.json();
+            list.forEach(emp => {
+              const opt = document.createElement('option');
+              opt.value = emp.id;
+              opt.textContent = `${emp.name} (${emp.employeeCode})`;
+              select.appendChild(opt);
+            });
+          }
+        } catch (e) {}
+      }
+      new bootstrap.Modal(document.getElementById('issueModal')).show();
+    }
+
+    function openReturnModal(id, code, empName) {
+      document.getElementById('returnAssetId').value = id;
+      document.getElementById('returnAssetInfo').textContent = `Returning Asset: ${code}` + (empName ? ` from ${empName}` : '');
+      new bootstrap.Modal(document.getElementById('returnModal')).show();
+    }
+
+    function openScrapModal(id, code) {
+      document.getElementById('scrapAssetId').value = id;
+      document.getElementById('scrapAssetInfo').textContent = `Marking Asset ${code} as obsolete / scrapped.`;
+      new bootstrap.Modal(document.getElementById('scrapModal')).show();
+    }
+
+    async function openRepairModal(id, code, name) {
+      document.getElementById('repairAssetId').value = id;
+      document.getElementById('repairAssetInfo').textContent = `Asset: ${code} (${name})`;
+      document.getElementById('repairActionType').value = 'STOCK';
+      document.getElementById('repairEmployeeGroup').classList.add('d-none');
+      document.getElementById('repairEmployeeId').removeAttribute('required');
+      document.getElementById('repairRemarks').value = '';
+
+      const select = document.getElementById('repairEmployeeId');
+      if (select.options.length <= 1) {
+        try {
+          const res = await fetch('/api/employees/active');
+          if (res.ok) {
+            const list = await res.json();
+            list.forEach(emp => {
+              const opt = document.createElement('option');
+              opt.value = emp.id;
+              opt.textContent = `${emp.name} (${emp.employeeCode})`;
+              select.appendChild(opt);
+            });
+          }
+        } catch (e) {}
+      }
+      new bootstrap.Modal(document.getElementById('repairModal')).show();
+    }
+
+    function openEditModal(id, serial, make, model, catId, branchId, pDate, pValue) {
+      document.getElementById('editAssetId').value = id;
+      document.getElementById('editSerialNumber').value = serial;
+      document.getElementById('editMake').value = make;
+      document.getElementById('editModel').value = model;
+      document.getElementById('editCategoryId').value = catId;
+      document.getElementById('editBranchId').value = branchId;
+      document.getElementById('editPurchaseDate').value = pDate ? pDate.split('T')[0] : '';
+      document.getElementById('editPurchaseValue').value = pValue;
+      new bootstrap.Modal(document.getElementById('editAssetModal')).show();
+    }
+
+    async function deleteAsset(id, code) {
+      if (!confirm(`Are you sure you want to delete asset ${code}?`)) return;
+      try {
+        const res = await fetch(`/api/assets/${id}`, { method: 'DELETE' });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || 'Error deleting asset');
+        window.location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    document.getElementById('addAssetForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const data = {
+        serialNumber: form.serialNumber.value,
+        categoryId: form.categoryId.value,
+        make: form.make.value,
+        model: form.model.value,
+        branchId: form.branchId.value,
+        purchaseDate: form.purchaseDate.value,
+        purchaseValue: parseFloat(form.purchaseValue.value)
+      };
+
+      try {
+        const res = await fetch('/api/assets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || 'Error creating asset');
+        window.location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    document.getElementById('editAssetForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('editAssetId').value;
+      const data = {
+        serialNumber: document.getElementById('editSerialNumber').value,
+        categoryId: document.getElementById('editCategoryId').value,
+        make: document.getElementById('editMake').value,
+        model: document.getElementById('editModel').value,
+        branchId: document.getElementById('editBranchId').value,
+        purchaseDate: document.getElementById('editPurchaseDate').value,
+        purchaseValue: parseFloat(document.getElementById('editPurchaseValue').value)
+      };
+
+      try {
+        const res = await fetch(`/api/assets/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || 'Error updating asset');
+        window.location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    document.getElementById('issueAssetForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('issueAssetId').value;
+      const data = {
+        action: 'ISSUE',
+        employeeId: document.getElementById('issueEmployeeId').value,
+        remarks: document.getElementById('issueRemarks').value
+      };
+
+      try {
+        const res = await fetch(`/api/assets/${id}/update-status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || 'Error issuing asset');
+        window.location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    document.getElementById('returnAssetForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('returnAssetId').value;
+      const data = {
+        action: 'RETURN',
+        reason: document.getElementById('returnReason').value,
+        condition: document.getElementById('returnCondition').value,
+        remarks: document.getElementById('returnRemarks').value
+      };
+
+      try {
+        const res = await fetch(`/api/assets/${id}/update-status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || 'Error returning asset');
+        window.location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    document.getElementById('scrapAssetForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('scrapAssetId').value;
+      const data = {
+        action: 'SCRAP',
+        reason: document.getElementById('scrapReason').value,
+        remarks: document.getElementById('scrapRemarks').value
+      };
+
+      try {
+        const res = await fetch(`/api/assets/${id}/update-status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || 'Error scrapping asset');
+        window.location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    document.getElementById('repairActionType').addEventListener('change', (e) => {
+      const group = document.getElementById('repairEmployeeGroup');
+      const empSelect = document.getElementById('repairEmployeeId');
+      if (e.target.value === 'REISSUE') {
+        group.classList.remove('d-none');
+        empSelect.setAttribute('required', 'true');
+      } else {
+        group.classList.add('d-none');
+        empSelect.removeAttribute('required');
+      }
+    });
+
+    document.getElementById('repairAssetForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('repairAssetId').value;
+      const actionType = document.getElementById('repairActionType').value;
+      const remarks = document.getElementById('repairRemarks').value;
+      const employeeId = document.getElementById('repairEmployeeId').value;
+
+      const data = {
+        action: 'REPAIR',
+        remarks: remarks || 'Repair completed',
+        ...(actionType === 'REISSUE' && employeeId ? { employeeId } : {})
+      };
+
+      try {
+        const res = await fetch(`/api/assets/${id}/update-status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || 'Error completing repair');
+        window.location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    });

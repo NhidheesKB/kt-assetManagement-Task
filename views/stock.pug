@@ -1,0 +1,106 @@
+extends layout
+
+block content
+  .d-flex.justify-content-between.align-items-center.mb-3
+    h4.mb-0 Stock View
+    a.btn.btn-sm.btn-outline-primary(href="/assets") Go to Assets
+
+  .card.shadow-sm.mb-4
+    .card-header.bg-white.py-2
+      h6.mb-0.fw-bold Stock by Branch
+    .card-body.p-0
+      .table-responsive
+        table.table.table-hover.table-bordered.mb-0
+          thead.table-light
+            tr
+              th Branch
+              th City
+              th.text-center In-Stock Count
+              th.text-end Total Value
+          tbody
+            if byBranch.length === 0
+              tr
+                td.text-center.text-muted(colspan="4") No stock data available
+            else
+              each b in byBranch
+                tr
+                  td #{b.branchName}
+                  td #{b.city || '-'}
+                  td.text-center #{b.count}
+                  td.text-end.fw-bold $#{Number(b.totalValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          tfoot.table-light
+            tr.fw-bold
+              td(colspan="2") Total
+              td.text-center #{totals.totalCount}
+              td.text-end.text-success $#{Number(totals.totalValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+
+  .card.shadow-sm.mb-3
+    .card-body.py-3
+      form.row.g-2(method="GET" action="/stock")
+        .col-md-6
+          input.form-control.form-control-sm(type="text" name="search" value=search placeholder="Search make, model, serial, code...")
+        .col-md-4
+          select.form-select.form-select-sm(name="branchId")
+            option(value="") All Branches
+            if branches
+              each b in branches
+                option(value=b.id selected=selectedBranch === b.id) #{b.name}
+        .col-md-2.d-flex.gap-2
+          button.btn.btn-sm.btn-primary.w-100(type="submit") Filter
+          a.btn.btn-sm.btn-outline-secondary(href="/stock") Reset
+
+  .card.shadow-sm
+    .card-header.bg-white.py-2
+      h6.mb-0.fw-bold In-Stock Assets
+    .card-body
+      .table-responsive
+        table#stockTable.table.table-striped.table-bordered.w-100
+          thead.table-light
+            tr
+              th Asset Code
+              th Serial Number
+              th Make & Model
+              th Category
+              th Branch
+              th Purchase Value
+              th Actions
+          tbody
+            if assets.length === 0
+              tr
+                td.text-center.text-muted(colspan="7") No in-stock assets found
+            else
+              each a in assets
+                tr
+                  td.fw-bold #{a.assetCode}
+                  td #{a.serialNumber}
+                  td #{a.make} #{a.model}
+                  td #{a.category ? a.category.name : '-'}
+                  td #{a.branch ? a.branch.name : '-'}
+                  td.text-end $#{Number(a.purchaseValue).toFixed(2)}
+                  td.text-center
+                    a.btn.btn-sm.btn-outline-secondary(href=`/assets/${a.id}/history` title="History")
+                      i.bi.bi-clock-history
+
+      if meta
+        .d-flex.justify-content-between.align-items-center.mt-3.pt-2.border-top
+          .text-muted.small
+            | Showing #{meta.total === 0 ? 0 : ((meta.page - 1) * meta.limit) + 1} to #{((meta.page - 1) * meta.limit) + assets.length} of #{meta.total} records (Page #{meta.page} of #{meta.totalPages || 1})
+          ul.pagination.pagination-sm.mb-0
+            li.page-item(class=meta.page <= 1 ? 'disabled' : '')
+              a.page-link(href=meta.page <= 1 ? '#' : `?page=${meta.page - 1}&search=${encodeURIComponent(search || '')}&branchId=${selectedBranch || ''}`) Previous
+            - for (let p = 1; p <= (meta.totalPages || 1); p++)
+              li.page-item(class=meta.page === p ? 'active' : '')
+                a.page-link(href=`?page=${p}&search=${encodeURIComponent(search || '')}&branchId=${selectedBranch || ''}`) #{p}
+            li.page-item(class=meta.page >= meta.totalPages || meta.totalPages <= 1 ? 'disabled' : '')
+              a.page-link(href=meta.page >= meta.totalPages ? '#' : `?page=${meta.page + 1}&search=${encodeURIComponent(search || '')}&branchId=${selectedBranch || ''}`) Next
+
+block scripts
+  script.
+    document.addEventListener('DOMContentLoaded', () => {
+      new DataTable('#stockTable', {
+        paging: false,
+        searching: false,
+        info: false,
+        order: []
+      });
+    });

@@ -1,0 +1,166 @@
+extends ../layout
+
+block content
+  .d-flex.justify-content-between.align-items-center.mb-3
+    h4.mb-0 Asset Categories
+    button.btn.btn-primary(type="button" data-bs-toggle="modal" data-bs-target="#addCategoryModal")
+      i.bi.bi-plus-lg.me-1
+      | Add Category
+
+  .card.shadow-sm.mb-3
+    .card-body.py-3
+      form.row.g-2(method="GET" action="/categories")
+        .col-md-9
+          input.form-control.form-control-sm(type="text" name="search" value=search placeholder="Search category name or description...")
+        .col-md-3.d-flex.gap-2
+          button.btn.btn-sm.btn-primary.w-100(type="submit") Search
+          a.btn.btn-sm.btn-outline-secondary(href="/categories") Reset
+
+  .card.shadow-sm
+    .card-body
+      .table-responsive
+        table#categoriesTable.table.table-striped.table-bordered.w-100
+          thead.table-light
+            tr
+              th Category Name
+              th Description
+              th Actions
+          tbody
+            if categories.length === 0
+              tr
+                td.text-center.text-muted(colspan="3") No categories found
+            else
+              each c in categories
+                tr
+                  td.fw-bold #{c.name}
+                  td #{c.description || '-'}
+                  td.text-center
+                    .btn-group.btn-group-sm
+                      button.btn.btn-outline-primary(type="button" onclick=`openEditModal('${c.id}', '${c.name}', '${c.description || ''}')` title="Edit")
+                        i.bi.bi-pencil
+                      button.btn.btn-outline-danger(type="button" onclick=`deleteCategory('${c.id}', '${c.name}')` title="Delete")
+                        i.bi.bi-trash
+
+      if meta
+        .d-flex.justify-content-between.align-items-center.mt-3.pt-2.border-top
+          .text-muted.small
+            | Showing #{meta.total === 0 ? 0 : ((meta.page - 1) * meta.limit) + 1} to #{((meta.page - 1) * meta.limit) + categories.length} of #{meta.total} records (Page #{meta.page} of #{meta.totalPages || 1})
+          ul.pagination.pagination-sm.mb-0
+            li.page-item(class=meta.page <= 1 ? 'disabled' : '')
+              a.page-link(href=meta.page <= 1 ? '#' : `?page=${meta.page - 1}&search=${encodeURIComponent(search || '')}`) Previous
+            - for (let p = 1; p <= (meta.totalPages || 1); p++)
+              li.page-item(class=meta.page === p ? 'active' : '')
+                a.page-link(href=`?page=${p}&search=${encodeURIComponent(search || '')}`) #{p}
+            li.page-item(class=meta.page >= meta.totalPages || meta.totalPages <= 1 ? 'disabled' : '')
+              a.page-link(href=meta.page >= meta.totalPages ? '#' : `?page=${meta.page + 1}&search=${encodeURIComponent(search || '')}`) Next
+
+  #addCategoryModal.modal.fade(tabindex="-1")
+    .modal-dialog
+      .modal-content
+        form#addCategoryForm
+          .modal-header
+            h5.modal-title Add Category
+            button.btn-close(type="button" data-bs-dismiss="modal")
+          .modal-body.row.g-3
+            .col-12
+              label.form-label Name
+              input.form-control(type="text" name="name" required placeholder="e.g. Laptop, Mobile Phone, Screwdriver")
+            .col-12
+              label.form-label Description
+              textarea.form-control(name="description" rows="3")
+          .modal-footer
+            button.btn.btn-secondary(type="button" data-bs-dismiss="modal") Cancel
+            button.btn.btn-primary(type="submit") Save
+
+  #editCategoryModal.modal.fade(tabindex="-1")
+    .modal-dialog
+      .modal-content
+        form#editCategoryForm
+          input#editCatId(type="hidden")
+          .modal-header
+            h5.modal-title Edit Category
+            button.btn-close(type="button" data-bs-dismiss="modal")
+          .modal-body.row.g-3
+            .col-12
+              label.form-label Name
+              input#editCatName.form-control(type="text" name="name" required)
+            .col-12
+              label.form-label Description
+              textarea#editCatDescription.form-control(name="description" rows="3")
+          .modal-footer
+            button.btn.btn-secondary(type="button" data-bs-dismiss="modal") Cancel
+            button.btn.btn-primary(type="submit") Update
+
+block scripts
+  script.
+    document.addEventListener('DOMContentLoaded', () => {
+      new DataTable('#categoriesTable', {
+        paging: false,
+        searching: false,
+        info: false,
+        order: []
+      });
+    });
+
+    function openEditModal(id, name, description) {
+      document.getElementById('editCatId').value = id;
+      document.getElementById('editCatName').value = name;
+      document.getElementById('editCatDescription').value = description;
+      new bootstrap.Modal(document.getElementById('editCategoryModal')).show();
+    }
+
+    async function deleteCategory(id, name) {
+      if (!confirm(`Are you sure you want to delete category ${name}?`)) return;
+      try {
+        const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || 'Error deleting category');
+        window.location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    document.getElementById('addCategoryForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const data = {
+        name: form.name.value,
+        description: form.description.value
+      };
+
+      try {
+        const res = await fetch('/api/categories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || 'Error creating category');
+        window.location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    document.getElementById('editCategoryForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('editCatId').value;
+      const data = {
+        name: document.getElementById('editCatName').value,
+        description: document.getElementById('editCatDescription').value
+      };
+
+      try {
+        const res = await fetch(`/api/categories/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || 'Error updating category');
+        window.location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    });

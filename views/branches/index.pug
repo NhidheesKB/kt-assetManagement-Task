@@ -1,0 +1,199 @@
+extends ../layout
+
+block content
+  .d-flex.justify-content-between.align-items-center.mb-3
+    h4.mb-0 Branch Master
+    button.btn.btn-primary(type="button" data-bs-toggle="modal" data-bs-target="#addBranchModal")
+      i.bi.bi-plus-lg.me-1
+      | Add Branch
+
+  .card.shadow-sm.mb-3
+    .card-body.py-3
+      form.row.g-2(method="GET" action="/branches")
+        .col-md-9
+          input.form-control.form-control-sm(type="text" name="search" value=search placeholder="Search branch name, city, country...")
+        .col-md-3.d-flex.gap-2
+          button.btn.btn-sm.btn-primary.w-100(type="submit") Search
+          a.btn.btn-sm.btn-outline-secondary(href="/branches") Reset
+
+  .card.shadow-sm
+    .card-body
+      .table-responsive
+        table#branchesTable.table.table-striped.table-bordered.w-100
+          thead.table-light
+            tr
+              th Branch Name
+              th City
+              th Country
+              th Phone Number
+              th Address
+              th Actions
+          tbody
+            if branches.length === 0
+              tr
+                td.text-center.text-muted(colspan="6") No branches found
+            else
+              each b in branches
+                tr
+                  td.fw-bold #{b.name}
+                  td #{b.city}
+                  td #{b.country}
+                  td #{b.phoneNumber || '-'}
+                  td #{b.address || '-'}
+                  td.text-center
+                    .btn-group.btn-group-sm
+                      button.btn.btn-outline-primary(type="button" onclick=`openEditModal('${b.id}', '${b.name}', '${b.city}', '${b.country}', '${b.phoneNumber || ''}', '${b.address || ''}')` title="Edit")
+                        i.bi.bi-pencil
+                      button.btn.btn-outline-danger(type="button" onclick=`deleteBranch('${b.id}', '${b.name}')` title="Delete")
+                        i.bi.bi-trash
+
+      if meta
+        .d-flex.justify-content-between.align-items-center.mt-3.pt-2.border-top
+          .text-muted.small
+            | Showing #{meta.total === 0 ? 0 : ((meta.page - 1) * meta.limit) + 1} to #{((meta.page - 1) * meta.limit) + branches.length} of #{meta.total} records (Page #{meta.page} of #{meta.totalPages || 1})
+          ul.pagination.pagination-sm.mb-0
+            li.page-item(class=meta.page <= 1 ? 'disabled' : '')
+              a.page-link(href=meta.page <= 1 ? '#' : `?page=${meta.page - 1}&search=${encodeURIComponent(search || '')}`) Previous
+            - for (let p = 1; p <= (meta.totalPages || 1); p++)
+              li.page-item(class=meta.page === p ? 'active' : '')
+                a.page-link(href=`?page=${p}&search=${encodeURIComponent(search || '')}`) #{p}
+            li.page-item(class=meta.page >= meta.totalPages || meta.totalPages <= 1 ? 'disabled' : '')
+              a.page-link(href=meta.page >= meta.totalPages ? '#' : `?page=${meta.page + 1}&search=${encodeURIComponent(search || '')}`) Next
+
+  #addBranchModal.modal.fade(tabindex="-1")
+    .modal-dialog.modal-lg
+      .modal-content
+        form#addBranchForm
+          .modal-header
+            h5.modal-title Add Branch
+            button.btn-close(type="button" data-bs-dismiss="modal")
+          .modal-body.row.g-3
+            .col-md-6
+              label.form-label Name
+              input.form-control(type="text" name="name" required)
+            .col-md-6
+              label.form-label City
+              input.form-control(type="text" name="city" required)
+            .col-md-6
+              label.form-label Country
+              input.form-control(type="text" name="country" required)
+            .col-md-6
+              label.form-label Phone Number
+              input.form-control(type="text" name="phoneNumber" required)
+            .col-12
+              label.form-label Address
+              textarea.form-control(name="address" rows="2" required)
+          .modal-footer
+            button.btn.btn-secondary(type="button" data-bs-dismiss="modal") Cancel
+            button.btn.btn-primary(type="submit") Save
+
+  #editBranchModal.modal.fade(tabindex="-1")
+    .modal-dialog.modal-lg
+      .modal-content
+        form#editBranchForm
+          input#editBranchId(type="hidden")
+          .modal-header
+            h5.modal-title Edit Branch
+            button.btn-close(type="button" data-bs-dismiss="modal")
+          .modal-body.row.g-3
+            .col-md-6
+              label.form-label Name
+              input#editBranchName.form-control(type="text" name="name" required)
+            .col-md-6
+              label.form-label City
+              input#editBranchCity.form-control(type="text" name="city" required)
+            .col-md-6
+              label.form-label Country
+              input#editBranchCountry.form-control(type="text" name="country" required)
+            .col-md-6
+              label.form-label Phone Number
+              input#editBranchPhone.form-control(type="text" name="phoneNumber" required)
+            .col-12
+              label.form-label Address
+              textarea#editBranchAddress.form-control(name="address" rows="2" required)
+          .modal-footer
+            button.btn.btn-secondary(type="button" data-bs-dismiss="modal") Cancel
+            button.btn.btn-primary(type="submit") Update
+
+block scripts
+  script.
+    document.addEventListener('DOMContentLoaded', () => {
+      new DataTable('#branchesTable', {
+        paging: false,
+        searching: false,
+        info: false,
+        order: []
+      });
+    });
+
+    function openEditModal(id, name, city, country, phone, address) {
+      document.getElementById('editBranchId').value = id;
+      document.getElementById('editBranchName').value = name;
+      document.getElementById('editBranchCity').value = city;
+      document.getElementById('editBranchCountry').value = country;
+      document.getElementById('editBranchPhone').value = phone;
+      document.getElementById('editBranchAddress').value = address;
+      new bootstrap.Modal(document.getElementById('editBranchModal')).show();
+    }
+
+    async function deleteBranch(id, name) {
+      if (!confirm(`Are you sure you want to delete branch ${name}?`)) return;
+      try {
+        const res = await fetch(`/api/branches/${id}`, { method: 'DELETE' });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || 'Error deleting branch');
+        window.location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    document.getElementById('addBranchForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const data = {
+        name: form.name.value,
+        city: form.city.value,
+        country: form.country.value,
+        phoneNumber: form.phoneNumber.value,
+        address: form.address.value
+      };
+
+      try {
+        const res = await fetch('/api/branches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || 'Error creating branch');
+        window.location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    document.getElementById('editBranchForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('editBranchId').value;
+      const data = {
+        name: document.getElementById('editBranchName').value,
+        city: document.getElementById('editBranchCity').value,
+        country: document.getElementById('editBranchCountry').value,
+        phoneNumber: document.getElementById('editBranchPhone').value,
+        address: document.getElementById('editBranchAddress').value
+      };
+
+      try {
+        const res = await fetch(`/api/branches/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || 'Error updating branch');
+        window.location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    });

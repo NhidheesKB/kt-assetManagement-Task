@@ -1,0 +1,100 @@
+extends ../layout
+
+block content
+  .d-flex.justify-content-between.align-items-center.mb-3
+    h4.mb-0 Asset History: #{asset.assetCode}
+    a.btn.btn-sm.btn-outline-secondary(href="/assets") Back to Assets
+
+  .row.g-3.mb-4
+    .col-md-12
+      .card.shadow-sm
+        .card-header.bg-white
+          h6.mb-0.fw-bold Asset Information & Financial Utilization
+        .card-body
+          .row.g-3
+            .col-md-3
+              .text-muted.small Asset Code
+              .fw-bold.text-primary #{asset.assetCode}
+            .col-md-3
+              .text-muted.small Make & Model
+              .fw-bold #{asset.make} #{asset.model}
+            .col-md-3
+              .text-muted.small Serial Number
+              .fw-bold #{asset.serialNumber}
+            .col-md-3
+              .text-muted.small Category
+              .fw-bold #{asset.category ? asset.category.name : '-'}
+            .col-md-3
+              .text-muted.small Branch
+              .fw-bold #{asset.branch ? asset.branch.name : '-'} (#{asset.branch ? asset.branch.city : '-'})
+            .col-md-3
+              .text-muted.small Purchase Date
+              .fw-bold #{asset.purchaseDate}
+            .col-md-3
+              .text-muted.small Purchase Value
+              .fw-bold.text-success $#{Number(asset.purchaseValue).toFixed(2)}
+            .col-md-3
+              .text-muted.small Current Status / Assignee
+              div
+                if asset.status === 'IN_STOCK'
+                  span.badge.bg-success In Stock
+                else if asset.status === 'ISSUED'
+                  span.badge.bg-primary Issued
+                  span.ms-2.small (#{asset.issuedToEmployee ? asset.issuedToEmployee.name : '-'})
+                else if asset.status === 'REPAIR'
+                  span.badge.bg-warning.text-dark In Repair
+                else if asset.status === 'SCRAPPED'
+                  span.badge.bg-danger Scrapped
+
+  .card.shadow-sm
+    .card-header.bg-white
+      h6.mb-0.fw-bold Lifecycle Audit Log
+    .card-body.p-0
+      .table-responsive
+        table.table.table-striped.table-bordered.mb-0
+          thead.table-light
+            tr
+              th Date & Time
+              th Action
+              th Employee
+              th Reason
+              th Remarks
+          tbody
+            if histories.length === 0
+              tr
+                td.text-center.text-muted(colspan="5") No history entries recorded for this asset
+            else
+              each h in histories
+                tr
+                  td #{new Date(h.performedAt).toLocaleString()}
+                  td
+                    if h.action === 'PURCHASE'
+                      span.badge.bg-primary Purchase
+                    else if h.action === 'ISSUE'
+                      span.badge.bg-success Issue
+                    else if h.action === 'RETURN'
+                      span.badge.bg-warning.text-dark Return
+                    else if h.action === 'SCRAP'
+                      span.badge.bg-danger Scrap
+                    else
+                      span.badge.bg-secondary #{h.action}
+                  td
+                    if h.employee
+                      | #{h.employee.name} (#{h.employee.employeeCode})
+                    else
+                      | -
+                  td #{h.reason || '-'}
+                  td #{h.remarks || '-'}
+
+      if meta
+        .d-flex.justify-content-between.align-items-center.p-3.border-top
+          .text-muted.small
+            | Showing #{meta.total === 0 ? 0 : ((meta.page - 1) * meta.limit) + 1} to #{((meta.page - 1) * meta.limit) + histories.length} of #{meta.total} records (Page #{meta.page} of #{meta.totalPages || 1})
+          ul.pagination.pagination-sm.mb-0
+            li.page-item(class=meta.page <= 1 ? 'disabled' : '')
+              a.page-link(href=meta.page <= 1 ? '#' : `?page=${meta.page - 1}`) Previous
+            - for (let p = 1; p <= (meta.totalPages || 1); p++)
+              li.page-item(class=meta.page === p ? 'active' : '')
+                a.page-link(href=`?page=${p}`) #{p}
+            li.page-item(class=meta.page >= meta.totalPages || meta.totalPages <= 1 ? 'disabled' : '')
+              a.page-link(href=meta.page >= meta.totalPages ? '#' : `?page=${meta.page + 1}`) Next
