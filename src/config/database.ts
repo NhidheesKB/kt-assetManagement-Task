@@ -9,7 +9,7 @@ const dbUser = process.env.DB_USER!;
 const dbPassword = process.env.DB_PASSWORD!;
 const dbHost = process.env.DB_HOST!;
 const dbPort = Number(process.env.DB_PORT!);
-const caCert = process.env.ca!;
+const caCert = process.env.ca?.replace(/\\n/g, '\n')!;
 
 export const sequelize = new Sequelize(dbName, dbUser, dbPassword, {
   host: dbHost,

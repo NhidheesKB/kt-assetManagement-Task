@@ -1,6 +1,6 @@
 {
   "functions": {
-    "src/server.ts": {
+    "src/app.ts": {
       "includeFiles": "views/**"
     }
   }
