@@ -20,6 +20,7 @@
     "express": "^5.2.1",
     "express-async-handler": "^1.2.0",
     "pg": "^8.23.1",
+    "pg-hstore": "^2.3.4",
     "pug": "^3.0.4",
     "sequelize": "^6.37.8",
     "uuidv7": "^1.2.1",
