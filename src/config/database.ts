@@ -25,10 +25,11 @@ export const sequelize = new Sequelize(dbName, dbUser, dbPassword, {
     },
   },
   pool: {
-    max: 10,
+    max: 2,
     min: 0,
     acquire: 30000,
-    idle: 10000,
+    idle: 1000,
+    evict: 1000,
   },
 });
 
