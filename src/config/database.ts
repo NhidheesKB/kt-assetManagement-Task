@@ -17,15 +17,13 @@ export const sequelize = new Sequelize(dbName, dbUser, dbPassword, {
   dialect: 'postgres',
   dialectModule: pg,
   logging: false,
-  dialectOptions: caCert
-    ? {
-      ssl: {
-        require: true,
-        rejectUnauthorized: true,
-        ca: caCert,
-      },
-    }
-    : undefined,
+  dialectOptions: {
+    ssl: {
+      require: true,
+      rejectUnauthorized: false,
+      ...(caCert ? { ca: caCert } : {}),
+    },
+  },
   pool: {
     max: 10,
     min: 0,
